@@ -1,0 +1,75 @@
+{
+  "seed": 42,
+  "ruacd_cap_per_label_in_train": 10000,
+  "splits": {
+    "train": {
+      "rows": 25037,
+      "by_source": {
+        "ruacd": 20000,
+        "ruhsold": 5037
+      },
+      "by_label": {
+        "clean": 12694,
+        "abusive": 11206,
+        "sexual_hate": 421,
+        "religious_hate": 394,
+        "profane": 322
+      },
+      "by_source_and_label": {
+        "ruacd/abusive": 10000,
+        "ruacd/clean": 10000,
+        "ruhsold/abusive": 1206,
+        "ruhsold/clean": 2694,
+        "ruhsold/profane": 322,
+        "ruhsold/religious_hate": 394,
+        "ruhsold/sexual_hate": 421
+      }
+    },
+    "validation": {
+      "rows": 8429,
+      "by_source": {
+        "ruacd": 7350,
+        "ruhsold": 1079
+      },
+      "by_label": {
+        "clean": 4249,
+        "abusive": 3936,
+        "sexual_hate": 90,
+        "religious_hate": 85,
+        "profane": 69
+      },
+      "by_source_and_label": {
+        "ruacd/abusive": 3678,
+        "ruacd/clean": 3672,
+        "ruhsold/abusive": 258,
+        "ruhsold/clean": 577,
+        "ruhsold/profane": 69,
+        "ruhsold/religious_hate": 85,
+        "ruhsold/sexual_hate": 90
+      }
+    },
+    "test": {
+      "rows": 8430,
+      "by_source": {
+        "ruacd": 7350,
+        "ruhsold": 1080
+      },
+      "by_label": {
+        "clean": 4250,
+        "abusive": 3937,
+        "sexual_hate": 90,
+        "religious_hate": 84,
+        "profane": 69
+      },
+      "by_source_and_label": {
+        "ruacd/abusive": 3678,
+        "ruacd/clean": 3672,
+        "ruhsold/abusive": 259,
+        "ruhsold/clean": 578,
+        "ruhsold/profane": 69,
+        "ruhsold/religious_hate": 84,
+        "ruhsold/sexual_hate": 90
+      }
+    }
+  }
+}

@@ -56,7 +56,7 @@ _ZERO_WIDTH = dict.fromkeys(map(ord, "\u200b\u200c\u200d\u2060\ufeff"))
 _URL = re.compile(r"https?://\S+|www\.\S+", re.IGNORECASE)
 _MENTION = re.compile(r"@\w+")
 _NON_ALNUM = re.compile(r"[^a-z0-9]+")
-_REPEATS = re.compile(r"(.)\1{2,}")
+_REPEATS = re.compile(r"([a-z])\1{2,}")
 _LATIN_ALNUM = re.compile(r"[A-Za-z0-9]")
 
 
