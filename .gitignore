@@ -20,5 +20,3 @@ node_modules/
 .env.*
 !.env.example
 .DS_Store
-
-find . -type d -empty -not -path "./.git/*" -exec touch {}/.gitkeep \;
