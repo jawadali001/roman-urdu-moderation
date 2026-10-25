@@ -187,7 +187,8 @@ def main() -> None:
         "steps": steps,
         "after": _counts(cleaned),
     }
-    (INTERIM_DIR / "cleaning_report.json").write_text(json.dumps(report, indent=2), encoding="utf-8")
+    report_path = INTERIM_DIR / "cleaning_report.json"
+    report_path.write_text(json.dumps(report, indent=2), encoding="utf-8")
 
     print(f"before: {report['before']['rows']:,} rows")
     for s in steps:

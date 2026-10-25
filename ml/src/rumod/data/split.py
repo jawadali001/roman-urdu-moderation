@@ -179,8 +179,8 @@ def main() -> None:
             "by_source": {k: int(v) for k, v in part["source"].value_counts().items()},
             "by_label": {k: int(v) for k, v in part["label"].value_counts().items()},
             "by_source_and_label": {
-                f"{s}/{l}": int(n)
-                for (s, l), n in part.groupby(["source", "label"]).size().items()
+                f"{src}/{lab}": int(n)
+                for (src, lab), n in part.groupby(["source", "label"]).size().items()
             },
         }
     (PROCESSED_DIR / "split_report.json").write_text(json.dumps(report, indent=2), encoding="utf-8")
@@ -189,7 +189,8 @@ def main() -> None:
         print(f"\n{name}: {info['rows']:,} rows   by source {info['by_source']}")
         for label in labels["enabled"]:
             print(f"    {label:<15} {info['by_label'].get(label, 0):>7,}")
-    print(f"\nWritten to {PROCESSED_DIR.relative_to(REPO_ROOT)}/ (train.csv, validation.csv, test.csv)")
+    out_dir = PROCESSED_DIR.relative_to(REPO_ROOT)
+    print(f"\nWritten to {out_dir}/ (train.csv, validation.csv, test.csv)")
 
 
 if __name__ == "__main__":

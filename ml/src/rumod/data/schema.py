@@ -57,8 +57,8 @@ def load_labels(path: Path = LABELS_PATH) -> dict:
     config = yaml.safe_load(path.read_text(encoding="utf-8"))
     labels = config["labels"]
     return {
-        "name_to_id": {l["name"]: l["id"] for l in labels},
-        "enabled": [l["name"] for l in labels if l["enabled"]],
+        "name_to_id": {entry["name"]: entry["id"] for entry in labels},
+        "enabled": [entry["name"] for entry in labels if entry["enabled"]],
         "default": config["default_label"],
         "config": config,
     }

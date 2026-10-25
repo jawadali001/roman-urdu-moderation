@@ -1,0 +1,11 @@
+name: ci-web
+
+# Placeholder until the web app exists. Runs only when started by hand.
+on:
+  workflow_dispatch:
+
+jobs:
+  placeholder:
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo "Web checks will be added together with the web app."
