@@ -1,0 +1,24 @@
+# data and models
+data/raw/
+data/interim/
+ml/artifacts/*.joblib
+ml/artifacts/*.pkl
+
+# python
+__pycache__/
+.venv/
+*.egg-info/
+.pytest_cache/
+.ruff_cache/
+
+# node
+node_modules/
+.next/
+
+# secrets and OS
+.env
+.env.*
+!.env.example
+.DS_Store
+
+find . -type d -empty -not -path "./.git/*" -exec touch {}/.gitkeep \;
