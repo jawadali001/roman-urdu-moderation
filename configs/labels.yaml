@@ -1,0 +1,66 @@
+version: 1
+default_label: clean
+
+# action: what the product does with a message that gets this label
+#   allow = show normally, flag = show with a warning, block = hide
+labels:
+  - id: 0
+    name: clean
+    description: Normal messages, including banter and opinions without abuse.
+    action: allow
+    enabled: true
+    detector: model
+
+  - id: 1
+    name: abusive
+    description: Insults and abuse directed at a person or group.
+    action: block
+    enabled: true
+    detector: model
+
+  - id: 2
+    name: profane
+    description: Swearing or vulgar language not aimed at anyone in particular.
+    action: flag
+    enabled: true
+    detector: model
+
+  - id: 3
+    name: religious_hate
+    description: Hate or attacks targeting a religion, sect or religious group.
+    action: block
+    enabled: true
+    detector: model
+
+  - id: 4
+    name: sexual_hate
+    description: Sexually abusive or sexist hate directed at a person or group.
+    action: block
+    enabled: true
+    detector: model
+
+  - id: 5
+    name: threat
+    description: Direct threats of violence or harm.
+    action: block
+    enabled: false        # needs custom data
+    detector: model
+
+  - id: 6
+    name: spam
+    description: Promotions, scams, follow-for-follow, unsolicited links or offers.
+    action: flag
+    enabled: false        # needs custom data
+    detector: model
+
+  - id: 7
+    name: personal_info
+    description: Phone numbers, ID-style numbers or addresses shared in a message.
+    action: flag
+    enabled: false        # handled mainly by regex rules
+    detector: rules
+
+# Starting values only. Tune these on the validation set, never the test set.
+thresholds:
+  block: 0.80
+  flag: 0.50
