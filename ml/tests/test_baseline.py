@@ -82,3 +82,19 @@ def test_loading_with_a_different_normalizer_version_fails(model, tmp_path):
 def test_training_metadata_is_recorded(model):
     assert model.meta["train_rows"] == 100
     assert model.meta["train_label_counts"] == {"abusive": 50, "clean": 50}
+
+def test_sqrt_balanced_weights():
+    from rumod.models.baseline import sqrt_balanced_weights
+
+    weights = sqrt_balanced_weights(["a"] * 100 + ["b"] * 25)
+    # balanced would be a: 0.625, b: 2.5 -> square roots
+    assert weights["a"] == pytest.approx(0.625**0.5)
+    assert weights["b"] == pytest.approx(2.5**0.5)
+
+
+def test_fit_accepts_sqrt_class_weight():
+    texts = CLEAN_TEXTS * 3 + ABUSIVE_TEXTS * 3
+    labels = ["clean"] * len(CLEAN_TEXTS) * 3 + ["abusive"] * len(ABUSIVE_TEXTS) * 3
+    model = ModerationModel.fit(texts, labels, min_df=1, ngram_range=(2, 4), class_weight="sqrt")
+    assert model.predict(["tum gandu kamina ho"])[0]["label"] == "abusive"
+    assert set(model.meta["params"]["class_weight"]) == {"clean", "abusive"}

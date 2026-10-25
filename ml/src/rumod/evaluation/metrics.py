@@ -95,7 +95,16 @@ def toxic_vs_clean(y_true, y_pred) -> dict:
     precision = tp / p.sum() if p.sum() else 0.0
     recall = tp / t.sum() if t.sum() else 0.0
     f1 = 2 * precision * recall / (precision + recall) if precision + recall else 0.0
-    return {"precision": precision, "recall": recall, "f1": f1, "support": int(t.sum())}
+    clean_total = (~t).sum()
+    false_alarm_rate = float((~t & p).sum() / clean_total) if clean_total else 0.0
+    return {
+        "precision": precision,
+        "recall": recall,
+        "f1": f1,
+        "support": int(t.sum()),
+        # share of genuinely clean messages that get flagged: the cost users feel
+        "false_alarm_rate": false_alarm_rate,
+    }
 
 
 def evaluate_by_source(
@@ -141,5 +150,6 @@ def format_report(results: dict) -> str:
                          f"{c['f1']:>7.3f}  {ci:<15}{c['support']:>6}")
         tv = rep["toxic_vs_clean"]
         lines.append(f"toxic-vs-clean: precision {tv['precision']:.3f}  "
-                     f"recall {tv['recall']:.3f}  F1 {tv['f1']:.3f}")
+                     f"recall {tv['recall']:.3f}  F1 {tv['f1']:.3f}  "
+                     f"false alarms on clean {tv['false_alarm_rate']:.1%}")
     return "\n".join(lines)

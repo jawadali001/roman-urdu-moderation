@@ -24,6 +24,19 @@ DEFAULT_PARAMS = {
 }
 
 
+def sqrt_balanced_weights(labels) -> dict[str, float]:
+    """Square root of sklearn's "balanced" weights: a gentler boost for small classes.
+
+    Fully balanced weights can over-flag, because a class with 300 rows gets a
+    weight about 40x that of a class with 12,000 rows. The square root keeps the
+    direction but halves the gap on a log scale.
+    """
+    labels = list(labels)
+    classes = sorted(set(labels))
+    total, k = len(labels), len(classes)
+    return {c: float((total / (k * labels.count(c))) ** 0.5) for c in classes}
+
+
 def build_pipeline(**overrides) -> Pipeline:
     """TF-IDF over character n-grams inside words, then multinomial LR.
 

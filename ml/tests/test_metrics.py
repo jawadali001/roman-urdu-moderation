@@ -57,6 +57,8 @@ def test_toxic_vs_clean():
     assert res["precision"] == pytest.approx(0.5)
     assert res["recall"] == pytest.approx(0.5)
     assert res["support"] == 2
+    # clean rows: 1 and 4; row 4 was flagged -> 1 of 2
+    assert res["false_alarm_rate"] == pytest.approx(0.5)
 
 
 def test_ruacd_predictions_are_collapsed_to_binary():

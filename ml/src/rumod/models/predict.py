@@ -14,7 +14,7 @@ import joblib
 import numpy as np
 
 from rumod.features.normalize import NORMALIZER_VERSION, normalize_batch
-from rumod.models.baseline import DEFAULT_PARAMS, build_pipeline
+from rumod.models.baseline import DEFAULT_PARAMS, build_pipeline, sqrt_balanced_weights
 
 BUNDLE_FORMAT_VERSION = 1
 
@@ -37,8 +37,11 @@ class ModerationModel:
         labels = list(labels)
         normalized = normalize_batch(texts)
         keep = [i for i, t in enumerate(normalized) if t]  # drop rows that normalize to ""
+        kept_labels = [labels[i] for i in keep]
+        if params.get("class_weight") == "sqrt":
+            params = {**params, "class_weight": sqrt_balanced_weights(kept_labels)}
         pipeline = build_pipeline(**params)
-        pipeline.fit([normalized[i] for i in keep], [labels[i] for i in keep])
+        pipeline.fit([normalized[i] for i in keep], kept_labels)
 
         classes = [str(c) for c in pipeline.classes_]
         meta = {
