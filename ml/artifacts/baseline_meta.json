@@ -1,0 +1,25 @@
+{
+  "format_version": 1,
+  "normalizer_version": "1",
+  "trained_at": "2026-10-25T16:07:04+00:00",
+  "params": {
+    "ngram_range": [
+      2,
+      5
+    ],
+    "min_df": 2,
+    "max_features": 300000,
+    "C": 4.0,
+    "class_weight": "balanced",
+    "max_iter": 1000
+  },
+  "train_rows": 25037,
+  "train_rows_dropped_empty": 0,
+  "train_label_counts": {
+    "abusive": 11206,
+    "clean": 12694,
+    "profane": 322,
+    "religious_hate": 394,
+    "sexual_hate": 421
+  }
+}
