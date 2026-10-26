@@ -1,0 +1,417 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Labeling tool</title>
+<style>
+  :root {
+    --bg: #f6f6f4; --card: #ffffff; --text: #1d1d1b; --muted: #6b6b66; --line: #dcdcd6;
+    --accent: #2f5fd0; --accent-text: #ffffff; --good: #1f7a45; --warn: #a55a00; --bar: #e4e4de;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #151515; --card: #1f1f1f; --text: #ececea; --muted: #9a9a94; --line: #34342f;
+      --accent: #6d92f0; --accent-text: #0e1220; --good: #5cc98b; --warn: #e0a24a; --bar: #2b2b27;
+    }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text);
+         font: 16px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+  main { max-width: 820px; margin: 0 auto; padding: 20px 16px 60px; }
+  h1 { font-size: 1.25rem; margin: 0 0 4px; }
+  .muted { color: var(--muted); font-size: 0.9rem; }
+  .bar-row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin: 14px 0; }
+  button, .btn { font: inherit; border: 1px solid var(--line); background: var(--card); color: var(--text);
+                 border-radius: 8px; padding: 8px 14px; cursor: pointer; }
+  button:hover, .btn:hover { border-color: var(--accent); }
+  button.primary { background: var(--accent); color: var(--accent-text); border-color: var(--accent); }
+  button:disabled { opacity: 0.45; cursor: default; }
+  input[type=file] { display: none; }
+  .progress { height: 10px; background: var(--bar); border-radius: 6px; overflow: hidden; }
+  .progress > div { height: 100%; width: 0; background: var(--accent); transition: width 0.15s; }
+  .chips { display: flex; flex-wrap: wrap; gap: 6px; margin: 10px 0 18px; }
+  .chip { border: 1px solid var(--line); border-radius: 999px; padding: 2px 10px; font-size: 0.85rem;
+          background: var(--card); }
+  .chip.done { border-color: var(--good); color: var(--good); }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 20px; }
+  .msg-id { font-size: 0.8rem; color: var(--muted); display: flex; justify-content: space-between; }
+  .msg-text { font-size: 1.35rem; line-height: 1.5; margin: 12px 0 18px; white-space: pre-wrap;
+              overflow-wrap: anywhere; min-height: 3.5em; }
+  .labels { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 8px; }
+  .labels button { text-align: left; padding: 10px 12px; }
+  .labels button kbd { float: right; opacity: 0.6; font-size: 0.8rem; }
+  .labels button.active { background: var(--accent); color: var(--accent-text); border-color: var(--accent); }
+  .row { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; margin-top: 14px; }
+  .row input[type=text] { flex: 1; min-width: 180px; font: inherit; padding: 8px 10px; border-radius: 8px;
+                          border: 1px solid var(--line); background: var(--bg); color: var(--text); }
+  .banner { margin: 12px 0; padding: 10px 14px; border-radius: 8px; border: 1px solid var(--warn);
+            color: var(--warn); display: none; }
+  details { margin-top: 22px; background: var(--card); border: 1px solid var(--line); border-radius: 10px;
+            padding: 10px 14px; }
+  summary { cursor: pointer; font-weight: 600; }
+  details ul { margin: 8px 0 4px 18px; padding: 0; }
+  .empty { text-align: center; padding: 40px 10px; color: var(--muted); }
+  kbd { font-family: ui-monospace, Menlo, Consolas, monospace; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Labeling tool</h1>
+  <div class="muted">Works offline. Progress is saved in this browser automatically. Export a backup file now and then.</div>
+
+  <div class="bar-row">
+    <label class="btn primary" for="fileInput">Open CSV</label>
+    <input id="fileInput" type="file" accept=".csv,text/csv">
+    <button id="exportBtn" disabled>Export CSV</button>
+    <button id="resetBtn" disabled>Reset progress</button>
+    <span id="fileName" class="muted"></span>
+  </div>
+
+  <div class="progress"><div id="progressFill"></div></div>
+  <div id="progressText" class="muted" style="margin-top:6px">No file loaded.</div>
+  <div id="chips" class="chips"></div>
+  <div id="banner" class="banner"></div>
+
+  <div id="workspace">
+    <div class="card empty" id="placeholder">Open the batch file, for example <b>batch_01_to_label.csv</b>.</div>
+    <div class="card" id="card" style="display:none">
+      <div class="msg-id"><span id="msgId"></span><span id="msgPos"></span></div>
+      <div id="msgText" class="msg-text"></div>
+      <div id="labelButtons" class="labels"></div>
+      <div class="row">
+        <label><input type="checkbox" id="hardNeg"> Looks risky but is clean <kbd>H</kbd></label>
+        <input type="text" id="notes" placeholder="Notes (press N)">
+      </div>
+      <div class="row">
+        <button id="prevBtn">&larr; Back</button>
+        <button id="nextBtn">Next &rarr;</button>
+        <span class="muted">Labeling moves on to the next unlabeled message by itself.</span>
+      </div>
+    </div>
+  </div>
+
+  <details>
+    <summary>Quick reference</summary>
+    <ul>
+      <li><b>clean</b>: normal messages, opinions, jokes, criticism of ideas without insults, reporting abuse without endorsing it.</li>
+      <li><b>abusive</b>: insults or abuse aimed at a person or group.</li>
+      <li><b>profane</b>: swearing or vulgar words not aimed at anyone.</li>
+      <li><b>religious_hate</b>: attacks on a religion, sect or its followers.</li>
+      <li><b>sexual_hate</b>: sexually abusive or sexist hate.</li>
+      <li><b>unsure</b>: cannot decide after a careful read (keep under 5%). <b>unusable</b>: no readable Latin text.</li>
+      <li>If several apply, the most specific wins: religious_hate / sexual_hate, then abusive, then profane, then clean.</li>
+      <li>Label what the message says, not what you guess the writer meant. Full rules: docs/labeling-guide.md</li>
+    </ul>
+  </details>
+</main>
+
+<script>
+(() => {
+  "use strict";
+
+  const LABELS = [
+    { key: "1", name: "clean" },
+    { key: "2", name: "abusive" },
+    { key: "3", name: "profane" },
+    { key: "4", name: "religious_hate" },
+    { key: "5", name: "sexual_hate" },
+    { key: "u", name: "unsure" },
+    { key: "x", name: "unusable" },
+  ];
+  const TARGET = 50;            // examples wanted per class
+  const TARGET_CLASSES = ["clean", "abusive", "profane", "religious_hate", "sexual_hate"];
+  const BACKUP_EVERY = 50;      // remind about a backup after this many changes
+  const MAX_SECONDS = 60;       // ignore idle time when averaging
+  const STORAGE_PREFIX = "rumod-labels-v1:";
+
+  const state = {
+    fileName: "", columns: [], rows: [], index: 0, shownAt: Date.now(),
+    durations: [], unexported: 0,
+  };
+
+  // ---------- CSV -------------------------------------------------------
+  function parseCsv(text) {
+    if (text.charCodeAt(0) === 0xFEFF) text = text.slice(1);
+    const records = [];
+    let row = [], field = "", inQuotes = false, i = 0;
+    while (i < text.length) {
+      const c = text[i];
+      if (inQuotes) {
+        if (c === '"') {
+          if (text[i + 1] === '"') { field += '"'; i += 2; continue; }
+          inQuotes = false; i++; continue;
+        }
+        field += c; i++; continue;
+      }
+      if (c === '"') { inQuotes = true; i++; continue; }
+      if (c === ",") { row.push(field); field = ""; i++; continue; }
+      if (c === "\r") { i++; continue; }
+      if (c === "\n") { row.push(field); records.push(row); row = []; field = ""; i++; continue; }
+      field += c; i++;
+    }
+    if (field !== "" || row.length) { row.push(field); records.push(row); }
+    const cleaned = records.filter(r => !(r.length === 1 && r[0] === ""));
+    if (!cleaned.length) throw new Error("The file is empty.");
+    const columns = cleaned.shift().map(c => c.trim());
+    const rows = cleaned.map(r => {
+      const obj = {};
+      columns.forEach((c, k) => { obj[c] = r[k] !== undefined ? r[k] : ""; });
+      return obj;
+    });
+    return { columns, rows };
+  }
+
+  function toCsv(columns, rows) {
+    const quote = v => {
+      v = v === undefined || v === null ? "" : String(v);
+      return /[",\n\r]/.test(v) || /^\s|\s$/.test(v) ? '"' + v.replace(/"/g, '""') + '"' : v;
+    };
+    const lines = [columns.map(quote).join(",")];
+    rows.forEach(r => lines.push(columns.map(c => quote(r[c])).join(",")));
+    return lines.join("\n") + "\n";
+  }
+
+  // ---------- state helpers ---------------------------------------------
+  const isLabeled = r => r.label !== "";
+  const storageKey = () => STORAGE_PREFIX + state.fileName;
+
+  function save() {
+    const labels = {};
+    state.rows.forEach(r => {
+      if (isLabeled(r) || r.notes || r.is_hard_negative)
+        labels[r.id] = { label: r.label, is_hard_negative: r.is_hard_negative, notes: r.notes };
+    });
+    try { localStorage.setItem(storageKey(), JSON.stringify({ labels, index: state.index })); }
+    catch (e) { /* storage full or blocked: the export button still works */ }
+  }
+
+  function restore() {
+    let saved = null;
+    try { saved = JSON.parse(localStorage.getItem(storageKey()) || "null"); } catch (e) { saved = null; }
+    if (!saved) return false;
+    state.rows.forEach(r => {
+      const s = saved.labels && saved.labels[r.id];
+      if (s) { r.label = s.label; r.is_hard_negative = s.is_hard_negative; r.notes = s.notes; }
+    });
+    state.index = Math.min(saved.index || 0, state.rows.length - 1);
+    return true;
+  }
+
+  function findNextUnlabeled(from) {
+    const n = state.rows.length;
+    for (let step = 1; step <= n; step++) {
+      const i = (from + step) % n;
+      if (!isLabeled(state.rows[i])) return i;
+    }
+    return -1;
+  }
+
+  function counts() {
+    const c = {};
+    LABELS.forEach(l => { c[l.name] = 0; });
+    state.rows.forEach(r => { if (c[r.label] !== undefined) c[r.label]++; });
+    return c;
+  }
+
+  function loadText(text, fileName) {
+    const { columns, rows } = parseCsv(text);
+    if (!columns.includes("id") || !columns.includes("text"))
+      throw new Error("The file needs the columns id and text.");
+    const ids = new Set();
+    rows.forEach(r => {
+      if (ids.has(r.id)) throw new Error("Duplicate id: " + r.id);
+      ids.add(r.id);
+    });
+    ["label", "is_hard_negative", "notes"].forEach(c => {
+      if (!columns.includes(c)) columns.push(c);
+      rows.forEach(r => { if (r[c] === undefined) r[c] = ""; });
+    });
+    const known = new Set(LABELS.map(l => l.name));
+    rows.forEach(r => { if (r.label !== "" && !known.has(r.label)) r.label = ""; });
+
+    state.fileName = fileName; state.columns = columns; state.rows = rows;
+    state.index = 0; state.durations = []; state.unexported = 0;
+    const restored = restore();
+    if (!restored) {
+      const first = rows.findIndex(r => !isLabeled(r));
+      state.index = first === -1 ? 0 : first;
+    }
+    state.shownAt = Date.now();
+    render();
+    return rows.length;
+  }
+
+  // ---------- actions -----------------------------------------------------
+  function setLabel(name) {
+    const row = state.rows[state.index];
+    if (!row) return;
+    const wasLabeled = isLabeled(row);
+    if (!wasLabeled) {
+      state.durations.push(Math.min((Date.now() - state.shownAt) / 1000, MAX_SECONDS));
+      if (state.durations.length > 50) state.durations.shift();
+    }
+    row.label = name;
+    if (name !== "clean") row.is_hard_negative = "";
+    state.unexported++;
+    const next = findNextUnlabeled(state.index);
+    if (next !== -1 && !wasLabeled) state.index = next;
+    save();   // after moving on, so a reload resumes at the next message
+    state.shownAt = Date.now();
+    render();
+  }
+
+  function toggleHardNegative() {
+    const row = state.rows[state.index];
+    if (!row || row.label !== "clean") return;
+    row.is_hard_negative = row.is_hard_negative ? "" : "yes";
+    state.unexported++;
+    save(); render();
+  }
+
+  function move(delta) {
+    if (!state.rows.length) return;
+    state.index = Math.max(0, Math.min(state.rows.length - 1, state.index + delta));
+    state.shownAt = Date.now();
+    save(); render();
+  }
+
+  function exportText() { return toCsv(state.columns, state.rows); }
+
+  function exportFile() {
+    const base = state.fileName.replace(/\.csv$/i, "");
+    const name = base.includes("_to_label") ? base.replace("_to_label", "_labeled") : base + "_labeled";
+    const blob = new Blob([exportText()], { type: "text/csv;charset=utf-8" });
+    const link = document.createElement("a");
+    link.href = URL.createObjectURL(blob);
+    link.download = name + ".csv";
+    document.body.appendChild(link); link.click(); link.remove();
+    state.unexported = 0; render();
+    return name + ".csv";
+  }
+
+  function resetProgress() {
+    if (!state.rows.length) return;
+    if (!window.confirm("Remove all labels for this file from this browser? Exported files are not affected.")) return;
+    try { localStorage.removeItem(storageKey()); } catch (e) { /* ignore */ }
+    state.rows.forEach(r => { r.label = ""; r.is_hard_negative = ""; r.notes = ""; });
+    state.index = 0; state.durations = []; state.unexported = 0; state.shownAt = Date.now();
+    render();
+  }
+
+  // ---------- rendering ---------------------------------------------------
+  const $ = id => document.getElementById(id);
+
+  function render() {
+    const total = state.rows.length;
+    const loaded = total > 0;
+    $("exportBtn").disabled = !loaded; $("resetBtn").disabled = !loaded;
+    $("fileName").textContent = state.fileName;
+    $("placeholder").style.display = loaded ? "none" : "";
+    $("card").style.display = loaded ? "" : "none";
+
+    const c = counts();
+    const done = state.rows.filter(isLabeled).length;
+    $("progressFill").style.width = total ? (100 * done / total) + "%" : "0";
+
+    if (loaded) {
+      let text = done + " / " + total + " labeled (" + Math.round(100 * done / total) + "%)";
+      if (state.durations.length >= 5) {
+        const avg = state.durations.reduce((a, b) => a + b, 0) / state.durations.length;
+        const minutes = Math.round((total - done) * avg / 60);
+        text += " \u00b7 average " + avg.toFixed(1) + " s per message \u00b7 about " + minutes + " min left";
+      }
+      $("progressText").textContent = text;
+    } else {
+      $("progressText").textContent = "No file loaded.";
+    }
+
+    const chips = $("chips");
+    chips.textContent = "";
+    if (loaded) {
+      LABELS.forEach(l => {
+        const chip = document.createElement("span");
+        const isTarget = TARGET_CLASSES.includes(l.name);
+        chip.className = "chip" + (isTarget && c[l.name] >= TARGET ? " done" : "");
+        chip.textContent = l.name + " " + c[l.name] + (isTarget ? " / " + TARGET : "");
+        chips.appendChild(chip);
+      });
+    }
+
+    const banner = $("banner");
+    if (loaded && state.unexported >= BACKUP_EVERY) {
+      banner.style.display = "block";
+      banner.textContent = state.unexported + " changes since the last export. Export a backup file now.";
+    } else banner.style.display = "none";
+
+    if (!loaded) return;
+    const row = state.rows[state.index];
+    $("msgId").textContent = row.id;
+    $("msgPos").textContent = "message " + (state.index + 1) + " of " + total
+      + (done === total ? " \u00b7 all labeled, export your file" : "");
+    $("msgText").textContent = row.text;
+    $("hardNeg").checked = row.is_hard_negative === "yes";
+    $("hardNeg").disabled = row.label !== "clean";
+    if (document.activeElement !== $("notes")) $("notes").value = row.notes;
+
+    const box = $("labelButtons");
+    box.textContent = "";
+    LABELS.forEach(l => {
+      const button = document.createElement("button");
+      button.className = row.label === l.name ? "active" : "";
+      button.innerHTML = "";
+      button.append(l.name);
+      const key = document.createElement("kbd");
+      key.textContent = l.key.toUpperCase();
+      button.append(key);
+      button.addEventListener("click", () => setLabel(l.name));
+      box.appendChild(button);
+    });
+    $("prevBtn").disabled = state.index === 0;
+    $("nextBtn").disabled = state.index === total - 1;
+  }
+
+  // ---------- events ------------------------------------------------------
+  function handleKey(e) {
+    if (!state.rows.length || e.ctrlKey || e.metaKey || e.altKey) return;
+    const typing = e.target && (e.target.tagName === "INPUT" && e.target.type === "text"
+                                || e.target.tagName === "TEXTAREA");
+    if (typing) {
+      if (e.key === "Escape" || e.key === "Enter") { e.target.blur(); render(); }
+      return;
+    }
+    const key = e.key.length === 1 ? e.key.toLowerCase() : e.key;
+    const label = LABELS.find(l => l.key === key);
+    if (label) { e.preventDefault(); setLabel(label.name); return; }
+    if (key === "h") { e.preventDefault(); toggleHardNegative(); }
+    else if (key === "n") { e.preventDefault(); $("notes").focus(); }
+    else if (key === "ArrowLeft") { e.preventDefault(); move(-1); }
+    else if (key === "ArrowRight") { e.preventDefault(); move(1); }
+  }
+
+  document.addEventListener("keydown", handleKey);
+  $("hardNeg").addEventListener("change", toggleHardNegative);
+  $("prevBtn").addEventListener("click", () => move(-1));
+  $("nextBtn").addEventListener("click", () => move(1));
+  $("exportBtn").addEventListener("click", exportFile);
+  $("resetBtn").addEventListener("click", resetProgress);
+  $("notes").addEventListener("input", e => {
+    const row = state.rows[state.index];
+    if (row) { row.notes = e.target.value; save(); }
+  });
+  $("fileInput").addEventListener("change", async e => {
+    const file = e.target.files[0];
+    if (!file) return;
+    try { loadText(await file.text(), file.name); }
+    catch (err) { window.alert(err.message); }
+    e.target.value = "";
+  });
+
+  // exposed for testing
+  window.LabelCore = { parseCsv, toCsv, loadText, exportText, exportFile, setLabel, toggleHardNegative,
+                       move, state, counts, handleKey };
+  render();
+})();
+</script>
+</body>
+</html>

@@ -73,10 +73,14 @@ raw text ──► personal_info rules (raw text) ─┐
 - ☐ Confirm the provisional training setup for the API (proposed: RUACD capped at 1,000 per class, see section 7)
 - ☐ `personal_info` regex rules (run on raw text)
 
-### Phase 3: Own data and the 3 extra classes ☐
-- ☐ Labeling guide (`docs/labeling-guide.md`)
+### Phase 3: Own data and the 3 extra classes ⏳
+- ✅ Labeling guide (`docs/labeling-guide.md`)
+- ✅ Sampling script (`ml/scripts/sample_for_labeling.py`, logic in `rumod.data.labeling` with tests) and an offline labeling tool (`scripts/label_tool.html`)
+- ⏳ Hand-label batch 1 (about 640 messages, roughly 2 hours): target at least 50 per class, validation/test only
+- ☐ Second-labeler agreement check (Cohen's kappa) and a self-consistency re-label of 50 messages
+- ☐ Load the labeled batches into the pipeline as an evaluation-only source
+- ☐ Optional: a small chat-style set from outside the RUHSOLD tweets, for a genuinely different domain
 - ☐ Synthetic examples for spam, threat and personal_info (training only)
-- ☐ Hand-labeled **real** test set, about 500-800 rows with at least 50 per class (validation/test only)
 - ☐ Enable the three new classes in `labels.yaml`
 
 ### Phase 4: API ☐
@@ -115,6 +119,7 @@ All entries are from 2026-10-25.
 | `348c41b` | Baseline model, evaluation metrics, training script, this roadmap |
 | `7e48b54` | Experiment runner, false-alarm metric, softer class-weight option; experiment results committed |
 | `cb6e1e7` | Threshold-free comparison (AUC, recall at fixed false-alarm rates); results committed |
+| `cfe7f47` | Progress bars and stopwatches, verbose pytest, VS Code settings. Tag `v0.2-baseline` |
 
 ## 6. Key decisions
 
@@ -131,6 +136,8 @@ All entries are from 2026-10-25.
 | Report per source and per class, with confidence intervals | Hate classes have only about 70-90 validation/test rows each; one overall number would mostly measure RUACD |
 | RUACD predictions collapsed to clean/abusive when scoring | RUACD's "abusive" is broader than our `abusive` class |
 | Synthetic data is training-only; real hand-labeled data is evaluation-only | Prevents inflated scores from the model learning our own templates |
+| Hand-labeled messages come from the unlabeled RUHSOLD test tweets, a mix of random and model-picked rows; the model's predictions are hidden from the labeler | The pool is leakage-free (no model trained on it); random rows give unbiased class frequencies; candidates make sure the rare classes reach 50 examples; hiding predictions avoids anchoring |
+| Labeling in an offline browser tool, not a spreadsheet | Keyboard shortcuts, live class counts, autosave, backup reminders; faster and less error-prone |
 | Raw, interim and processed CSV files are not committed | Source licenses are not all confirmed and the files contain abusive text |
 | Tests and CI from the start | Core goal of the project is demonstrable engineering practice |
 
@@ -210,13 +217,14 @@ Splits: train 25,037 · validation 8,429 · test 8,430. Full breakdown and cavea
 
 1. **In-distribution:** held-out slices of RUHSOLD (all 5 classes) and RUACD (clean/abusive), reported separately.
 2. **Cross-dataset:** train on one source, test on the other.
-3. **Real hand-labeled set:** the most trustworthy number, since it comes from neither public dataset.
+3. **Hand-labeled set:** tweets from the unlabeled RUHSOLD test pool that no model has trained on, labeled by us. It is the leakage-free number. Metrics are reported for all rows and for the random rows alone. A small chat-style set can be added later for a different domain.
 4. The validation set is for tuning. The test set is scored once per finished model, and that number is the one reported.
 
 ## 10. Known issues and risks
 
 - **RUHSOLD packaging bugs:** unlabeled test split and duplicated validation split (handled, see `data/README.md`). Published benchmark numbers cannot be compared.
 - **Very high in-distribution RUACD scores are expected** and should not be trusted on their own: the file is preprocessed, partly English, and its labels are unverified. The baseline's RUACD F1 of 0.979 against 0.672 on RUHSOLD shows the gap. The cross-dataset and real-data tests are what count.
+- **The hand-labeled set is in-distribution:** it uses tweets from the RUHSOLD test pool, so it is leakage-free but not a new domain. Candidate rows were picked with the model's own scores and flatter it, so metrics are also reported on the random rows alone.
 - **RUACD may not represent real chat.** Models trained mostly on RUACD transfer poorly to tweets (see section 7), so the real hand-labeled set is needed before trusting any choice of training data.
 - **Fine-grained RUHSOLD classes overlap** (abusive vs profane, and toxic classes with each other), which caps how high per-class scores can go.
 - **Selection on the validation set:** comparing many variants on the same validation data gives optimistic results for the winner. The test set is scored once at the end.
@@ -241,6 +249,8 @@ python ml/src/rumod/data/split.py        # train / validation / test
 python ml/scripts/train_baseline.py      # model + validation report
 python ml/scripts/run_experiments.py     # data-source and model comparisons (validation only)
 python ml/scripts/compare_operating_points.py  # AUC and recall at fixed false-alarm rates
+python ml/scripts/sample_for_labeling.py       # batch of messages for hand labeling
+# then open scripts/label_tool.html in a browser and load the batch CSV
 
 cd ml; ruff check .; pytest              # lint and tests, one line per test with a percentage
 ```
@@ -248,7 +258,7 @@ cd ml; ruff check .; pytest              # lint and tests, one line per test wit
 ## 12. Next actions
 
 1. Confirm the provisional training setup (proposed: RUACD capped at 1,000 per class).
-2. Tag `v0.2-baseline`.
-3. Labeling guide, then the real hand-labeled set.
+2. Hand-label batch 1, then export and add the labeled file to the repo folder.
+3. Load the labeled set into the pipeline and score the model on it.
 4. Score the test set once for the chosen model.
 5. Update this file at every milestone and tag (`v0.3-api`, ...).
