@@ -15,6 +15,8 @@ from __future__ import annotations
 import numpy as np
 import pandas as pd
 
+from rumod.utils.progress import track
+
 CLEAN = "clean"
 COLLAPSE_TO_BINARY_SOURCES = ("ruacd",)
 
@@ -40,7 +42,13 @@ def _macro(f1: np.ndarray, support: np.ndarray) -> float:
 
 
 def classification_report(
-    y_true, y_pred, labels: list[str], n_boot: int = 1000, seed: int = 42
+    y_true,
+    y_pred,
+    labels: list[str],
+    n_boot: int = 1000,
+    seed: int = 42,
+    progress: bool = False,
+    desc: str = "bootstrap",
 ) -> dict:
     """Per-class precision/recall/F1 with bootstrap CIs, plus a confusion matrix."""
     index = {label: i for i, label in enumerate(labels)}
@@ -55,7 +63,7 @@ def classification_report(
     rng = np.random.default_rng(seed)
     f1_boot = np.empty((n_boot, k))
     macro_boot = np.empty(n_boot)
-    for b in range(n_boot):
+    for b in track(range(n_boot), desc, enabled=progress):
         sample = rng.integers(0, n, n)
         _, _, f1_b, support_b = _prf(t[sample], p[sample], k)
         f1_boot[b] = f1_b
@@ -108,7 +116,12 @@ def toxic_vs_clean(y_true, y_pred) -> dict:
 
 
 def evaluate_by_source(
-    df: pd.DataFrame, y_pred, labels: list[str], n_boot: int = 1000, seed: int = 42
+    df: pd.DataFrame,
+    y_pred,
+    labels: list[str],
+    n_boot: int = 1000,
+    seed: int = 42,
+    progress: bool = False,
 ) -> dict:
     """Report every source separately. `df` needs `label` and `source` columns."""
     predictions = pd.Series(np.asarray(y_pred), index=df.index)
@@ -124,7 +137,15 @@ def evaluate_by_source(
         else:
             source_labels = list(labels)
 
-        report = classification_report(y_true, y_hat, source_labels, n_boot=n_boot, seed=seed)
+        report = classification_report(
+            y_true,
+            y_hat,
+            source_labels,
+            n_boot=n_boot,
+            seed=seed,
+            progress=progress,
+            desc=f"confidence intervals ({source})",
+        )
         report["toxic_vs_clean"] = toxic_vs_clean(y_true, y_hat)
         report["collapsed_to_binary"] = collapsed
         results[source] = report

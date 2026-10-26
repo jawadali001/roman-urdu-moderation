@@ -11,6 +11,7 @@ dependencies = [
     "pandas>=2.2",
     "pyyaml>=6.0",
     "scikit-learn>=1.4",
+    "tqdm>=4.66",
 ]
 
 [project.optional-dependencies]
@@ -30,6 +31,8 @@ where = ["src"]
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 pythonpath = ["src"]
+# one line per test with a running percentage, plus the 5 slowest tests
+addopts = "-v --durations=5"
 
 [tool.ruff]
 line-length = 100

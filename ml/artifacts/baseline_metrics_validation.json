@@ -49,7 +49,8 @@
       "precision": 0.9728786251342643,
       "recall": 0.9850462207721588,
       "f1": 0.9789246149689274,
-      "support": 3678
+      "support": 3678,
+      "false_alarm_rate": 0.02750544662309368
     },
     "collapsed_to_binary": true
   },
@@ -163,7 +164,8 @@
       "precision": 0.8789144050104384,
       "recall": 0.8386454183266933,
       "f1": 0.8583078491335373,
-      "support": 502
+      "support": 502,
+      "false_alarm_rate": 0.10051993067590988
     },
     "collapsed_to_binary": false
   }

@@ -27,6 +27,7 @@ import json
 import time
 
 import pandas as pd
+from tqdm import tqdm
 
 from rumod.data.schema import REPO_ROOT
 from rumod.data.split import cap_per_label
@@ -115,7 +116,9 @@ def main() -> None:
         experiments += MODEL_GROUP
 
     rows = []
-    for name, sources, cap, params in experiments:
+    bar = tqdm(experiments, desc="experiments", unit="exp", dynamic_ncols=True)
+    for name, sources, cap, params in bar:
+        bar.set_postfix_str(name)
         subset = build_train(train, sources, cap)
         started = time.time()
         model = ModerationModel.fit(subset["text"], subset["label"], **params)
@@ -127,7 +130,7 @@ def main() -> None:
                "ruacd_cap": cap, "params": {k: str(v) for k, v in params.items()},
                **summarize(report)}
         rows.append(row)
-        print(f"  finished {name} in {time.time() - started:.0f}s", flush=True)
+        tqdm.write(f"  finished {name} in {time.time() - started:.0f}s")
 
     print_table(rows)
     ARTIFACTS_DIR.mkdir(parents=True, exist_ok=True)

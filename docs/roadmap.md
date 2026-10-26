@@ -67,8 +67,10 @@ raw text ──► personal_info rules (raw text) ─┐
 - ✅ Baseline model (character n-gram TF-IDF + logistic regression), first real run done (results in section 7)
 - ✅ Toxic-vs-clean view with a false-alarm rate (share of clean messages that get flagged)
 - ✅ Experiments: data-source ablation, cross-dataset, class-weight and regularization comparison (`ml/scripts/run_experiments.py`, results in section 7)
-- ⏳ Threshold-free comparison: ROC-AUC and recall at fixed false-alarm rates (`ml/scripts/compare_operating_points.py`). Script written, **run on the real data pending**
-- ☐ Choose the provisional training setup for the API, based on the comparison above
+- ✅ Threshold-free comparison: ROC-AUC and recall at fixed false-alarm rates (`ml/scripts/compare_operating_points.py`, results in section 7)
+- ✅ Progress bars and stopwatches for training, scoring, confidence intervals and the experiment scripts (opt-in, never used by the API); verbose pytest
+- ✅ VS Code settings (`.vscode/settings.json`) so the editor resolves the `rumod` package
+- ☐ Confirm the provisional training setup for the API (proposed: RUACD capped at 1,000 per class, see section 7)
 - ☐ `personal_info` regex rules (run on raw text)
 
 ### Phase 3: Own data and the 3 extra classes ☐
@@ -112,6 +114,7 @@ All entries are from 2026-10-25.
 | `603dc82` | `pyproject.toml`, CI workflow, lint fixes. `ci-ml` green (run #12) |
 | `348c41b` | Baseline model, evaluation metrics, training script, this roadmap |
 | `7e48b54` | Experiment runner, false-alarm metric, softer class-weight option; experiment results committed |
+| `cb6e1e7` | Threshold-free comparison (AUC, recall at fixed false-alarm rates); results committed |
 
 ## 6. Key decisions
 
@@ -174,6 +177,21 @@ Regularization (C) changes little, within the confidence intervals. No setting w
 
 Several variants were compared on the same validation set, so the best-looking one is slightly optimistic.
 
+**Threshold-free comparison** (`ml/scripts/compare_operating_points.py`, validation set, default model). Recall is the share of toxic messages caught when at most 5% of clean messages are flagged.
+
+| Training data | RUHSOLD AUC | RUHSOLD recall at 5% | RUACD AUC | RUACD recall at 5% |
+|---|---|---|---|---|
+| RUHSOLD only | 0.949 | **0.803** | 0.943 | 0.743 |
+| Both, RUACD cap 1,000 per class | 0.949 | 0.781 | 0.985 | 0.941 |
+| Both, RUACD cap 3,000 per class | 0.947 | 0.749 | 0.992 | 0.974 |
+| Both, RUACD cap 10,000 per class | 0.939 | 0.697 | **0.997** | **0.993** |
+
+- **The trend holds at equal false-alarm rates:** more RUACD lowers recall on RUHSOLD (0.803, 0.781, 0.749, 0.697), so the earlier result was not an artifact of one threshold.
+- **A small dose of RUACD gets most of the benefit.** 1,000 RUACD rows per class lift RUACD recall from 0.743 to 0.941 and cost about 2 points on RUHSOLD, which is within noise (about 500 toxic validation tweets, so roughly 2 points of standard error). Going from 1,000 to 10,000 adds another 5 points on RUACD but costs another 8 on RUHSOLD.
+- Keeping false alarms at 5% on RUHSOLD needs a toxic-score threshold of about 0.75-0.83: the model has to be fairly sure before flagging.
+- Even the best RUHSOLD setup misses about 20% of toxic tweets at 5% false alarms. That is the ceiling of this baseline; improving it needs a better model or better data.
+- **Proposed provisional setup: RUACD capped at 1,000 per class** (7,037 training rows). It matches RUHSOLD-only on RUHSOLD AUC and keeps most of RUACD's coverage. This is a proposal, to be revisited once the real hand-labeled set can arbitrate.
+
 ## 8. Data snapshot
 
 Raw: RUHSOLD 7,208 labeled rows (train only is usable), RUACD 147,180 rows. After cleaning: **154,192** rows (RUACD 146,996, RUHSOLD 7,196).
@@ -207,6 +225,7 @@ Splits: train 25,037 · validation 8,429 · test 8,430. Full breakdown and cavea
 - **Style mismatch** between RUACD (preprocessed) and raw tweets or chat, addressed by `normalize()`.
 - **Roman Urdu only:** text in Urdu script or with no Latin letters is treated as empty and gets the default label.
 - **Windows:** `make` is not installed by default, so the Makefile is not used yet.
+- **Editor warnings:** VS Code can show "import could not be resolved" for `rumod` when it misses the editable install. `.vscode/settings.json` points it at `ml/src`; restart the language server if it persists.
 - **Free-tier hosting cold starts** will make the first API call slow; the frontends need loading states.
 
 ## 11. How to reproduce
@@ -223,12 +242,12 @@ python ml/scripts/train_baseline.py      # model + validation report
 python ml/scripts/run_experiments.py     # data-source and model comparisons (validation only)
 python ml/scripts/compare_operating_points.py  # AUC and recall at fixed false-alarm rates
 
-cd ml; ruff check .; pytest -q           # lint and tests (same as CI)
+cd ml; ruff check .; pytest              # lint and tests, one line per test with a percentage
 ```
 
 ## 12. Next actions
 
-1. Run the threshold-free comparison on the real data and choose a provisional training setup for the API (the final choice waits for the real hand-labeled set).
+1. Confirm the provisional training setup (proposed: RUACD capped at 1,000 per class).
 2. Tag `v0.2-baseline`.
 3. Labeling guide, then the real hand-labeled set.
 4. Score the test set once for the chosen model.

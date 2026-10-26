@@ -23,6 +23,7 @@ import argparse
 import json
 
 import pandas as pd
+from tqdm import tqdm
 
 from rumod.data.schema import REPO_ROOT
 from rumod.evaluation.operating_points import DEFAULT_TARGETS, operating_summary, toxic_scores
@@ -78,17 +79,19 @@ def main() -> None:
     validation = pd.read_csv(DATA_DIR / "validation.csv", keep_default_na=False)
 
     results = {}
-    for name in args.variants:
+    bar = tqdm(args.variants, desc="variants", unit="variant", dynamic_ncols=True)
+    for name in bar:
+        bar.set_postfix_str(name)
         sources, cap = VARIANTS[name]
         subset = build_train(train, sources, cap)
         model = ModerationModel.fit(subset["text"], subset["label"])
         scores = pd.Series(toxic_scores(model, validation["text"]), index=validation.index)
-        entry = {"train_rows": len(subset)}
+        entry: dict[str, object] = {"train_rows": len(subset)}
         for source, part in validation.groupby("source"):
             y_toxic = (part["label"] != "clean").to_numpy()
             entry[source] = operating_summary(y_toxic, scores.loc[part.index].to_numpy())
         results[name] = entry
-        print(f"  finished {name}", flush=True)
+        tqdm.write(f"  finished {name}")
 
     print_table(results)
     ARTIFACTS_DIR.mkdir(parents=True, exist_ok=True)

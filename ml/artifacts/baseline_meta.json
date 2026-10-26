@@ -1,7 +1,7 @@
 {
   "format_version": 1,
   "normalizer_version": "1",
-  "trained_at": "2026-10-25T16:07:04+00:00",
+  "trained_at": "2026-10-26T05:40:16+00:00",
   "params": {
     "ngram_range": [
       2,
