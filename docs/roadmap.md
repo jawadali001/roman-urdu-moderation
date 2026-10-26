@@ -66,8 +66,9 @@ raw text ──► personal_info rules (raw text) ─┐
 - ✅ Evaluation metrics: per-class and per-source scores with bootstrap confidence intervals
 - ✅ Baseline model (character n-gram TF-IDF + logistic regression), first real run done (results in section 7)
 - ✅ Toxic-vs-clean view with a false-alarm rate (share of clean messages that get flagged)
-- ⏳ Experiments: data-source ablation and cross-dataset (train on one source, test on the other), plus class-weight and regularization comparison. Script written (`ml/scripts/run_experiments.py`), **run on the real data pending**
-- ☐ Threshold tuning on validation data
+- ✅ Experiments: data-source ablation, cross-dataset, class-weight and regularization comparison (`ml/scripts/run_experiments.py`, results in section 7)
+- ⏳ Threshold-free comparison: ROC-AUC and recall at fixed false-alarm rates (`ml/scripts/compare_operating_points.py`). Script written, **run on the real data pending**
+- ☐ Choose the provisional training setup for the API, based on the comparison above
 - ☐ `personal_info` regex rules (run on raw text)
 
 ### Phase 3: Own data and the 3 extra classes ☐
@@ -110,6 +111,7 @@ All entries are from 2026-10-25.
 | `cff6c95`, `1fcbaba` | Data README (moved to the right folder), normalization with tests. **Tag `v0.1-data`** |
 | `603dc82` | `pyproject.toml`, CI workflow, lint fixes. `ci-ml` green (run #12) |
 | `348c41b` | Baseline model, evaluation metrics, training script, this roadmap |
+| `7e48b54` | Experiment runner, false-alarm metric, softer class-weight option; experiment results committed |
 
 ## 6. Key decisions
 
@@ -149,6 +151,29 @@ What the confusion matrix shows:
 
 These are validation numbers from the first model. The test set has not been scored yet.
 
+**Experiments** (`ml/scripts/run_experiments.py`, validation set, same default model unless stated).
+
+| Training data | Rows | RUHSOLD macro-F1 [95% CI] | RUHSOLD toxic F1 | RUACD F1 |
+|---|---|---|---|---|
+| RUHSOLD only | 5,037 | **0.719** [0.683, 0.752] | 0.880 | 0.860 |
+| RUACD only | 20,000 | 0.258 (cannot predict the hate classes) | 0.633 | 0.984 |
+| Both, RUACD cap 3,000 per class | 11,037 | 0.702 [0.667, 0.736] | 0.872 | 0.963 |
+| Both, RUACD cap 10,000 per class (baseline) | 25,037 | 0.676 [0.637, 0.708] | 0.856 | 0.979 |
+
+- **More RUACD does not help on RUHSOLD.** RUHSOLD scores fall steadily as RUACD grows (macro-F1 0.719, 0.702, 0.676; toxic F1 0.880, 0.872, 0.856). The intervals overlap, so no single gap is conclusive, but the trend is consistent. RUACD mainly improves RUACD's own score.
+- **Cross-dataset transfer is lopsided.** A model trained only on the 5,037 RUHSOLD rows reaches F1 0.860 on RUACD. A model trained only on RUACD catches just 48% of the toxic RUHSOLD tweets. RUACD's idea of "abusive" does not carry over to tweets.
+- **Class weights decide the trade-off** (both sources, RUACD cap 10,000):
+
+| Class weights | RUHSOLD macro-F1 | Toxic recall | False alarms on clean | RUACD false alarms |
+|---|---|---|---|---|
+| balanced (C 1 / 4 / 16) | 0.676-0.677 | 0.829-0.835 | 11.3% / 10.1% / 8.8% | 3.5% / 2.8% / 2.2% |
+| sqrt (gentler) | 0.640-0.668 | 0.775-0.805 | 7.6% / 6.9% / 7.6% | 2.5% / 2.0% / 1.8% |
+| none | 0.532-0.613 | 0.699-0.769 | 4.2% / 5.2% / 6.1% | 1.8% / 1.5% / 1.5% |
+
+Regularization (C) changes little, within the confidence intervals. No setting wins on every measure: fewer false alarms cost recall. That is a threshold decision, which is why the next comparison looks at recall at fixed false-alarm rates.
+
+Several variants were compared on the same validation set, so the best-looking one is slightly optimistic.
+
 ## 8. Data snapshot
 
 Raw: RUHSOLD 7,208 labeled rows (train only is usable), RUACD 147,180 rows. After cleaning: **154,192** rows (RUACD 146,996, RUHSOLD 7,196).
@@ -174,6 +199,7 @@ Splits: train 25,037 · validation 8,429 · test 8,430. Full breakdown and cavea
 
 - **RUHSOLD packaging bugs:** unlabeled test split and duplicated validation split (handled, see `data/README.md`). Published benchmark numbers cannot be compared.
 - **Very high in-distribution RUACD scores are expected** and should not be trusted on their own: the file is preprocessed, partly English, and its labels are unverified. The baseline's RUACD F1 of 0.979 against 0.672 on RUHSOLD shows the gap. The cross-dataset and real-data tests are what count.
+- **RUACD may not represent real chat.** Models trained mostly on RUACD transfer poorly to tweets (see section 7), so the real hand-labeled set is needed before trusting any choice of training data.
 - **Fine-grained RUHSOLD classes overlap** (abusive vs profane, and toxic classes with each other), which caps how high per-class scores can go.
 - **Selection on the validation set:** comparing many variants on the same validation data gives optimistic results for the winner. The test set is scored once at the end.
 - **Tiny hate classes:** 460-601 rows each overall, so their scores are noisy.
@@ -195,13 +221,14 @@ python ml/src/rumod/data/clean.py        # cleaned.csv
 python ml/src/rumod/data/split.py        # train / validation / test
 python ml/scripts/train_baseline.py      # model + validation report
 python ml/scripts/run_experiments.py     # data-source and model comparisons (validation only)
+python ml/scripts/compare_operating_points.py  # AUC and recall at fixed false-alarm rates
 
 cd ml; ruff check .; pytest -q           # lint and tests (same as CI)
 ```
 
 ## 12. Next actions
 
-1. Run the experiments on the real data and decide the training setup: whether RUACD helps on RUHSOLD, which class-weight and C setting reduces false alarms without losing recall.
+1. Run the threshold-free comparison on the real data and choose a provisional training setup for the API (the final choice waits for the real hand-labeled set).
 2. Tag `v0.2-baseline`.
 3. Labeling guide, then the real hand-labeled set.
 4. Score the test set once for the chosen model.
