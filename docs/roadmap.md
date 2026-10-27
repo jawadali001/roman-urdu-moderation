@@ -76,9 +76,9 @@ raw text ──► personal_info rules (raw text) ─┐
 ### Phase 3: Own data and the 3 extra classes ⏳
 - ✅ Labeling guide (`docs/labeling-guide.md`)
 - ✅ Sampling script (`ml/scripts/sample_for_labeling.py`, logic in `rumod.data.labeling` with tests) and an offline labeling tool (`scripts/label_tool.html`)
-- ⏳ Hand-label batch 1 (about 640 messages, roughly 2 hours): target at least 50 per class, validation/test only
+- ✅ Checking and scoring for the labeled set (`ml/scripts/check_labeled_batch.py`, `ml/scripts/score_real_set.py`, loader in `rumod.data.real_set`, tests)
+- ⏳ Hand-label batch 1 (about 640 messages, roughly 2 hours): target at least 50 per class, scored as a test set only
 - ☐ Second-labeler agreement check (Cohen's kappa) and a self-consistency re-label of 50 messages
-- ☐ Load the labeled batches into the pipeline as an evaluation-only source
 - ☐ Optional: a small chat-style set from outside the RUHSOLD tweets, for a genuinely different domain
 - ☐ Synthetic examples for spam, threat and personal_info (training only)
 - ☐ Enable the three new classes in `labels.yaml`
@@ -119,7 +119,8 @@ All entries are from 2026-10-25.
 | `348c41b` | Baseline model, evaluation metrics, training script, this roadmap |
 | `7e48b54` | Experiment runner, false-alarm metric, softer class-weight option; experiment results committed |
 | `cb6e1e7` | Threshold-free comparison (AUC, recall at fixed false-alarm rates); results committed |
-| `cfe7f47` | Progress bars and stopwatches, verbose pytest, VS Code settings. Tag `v0.2-baseline` |
+| `cfe7f47` | Progress bars and stopwatches, verbose pytest, VS Code settings |
+| `2536061` | Labeling kit: guide, sampler, offline labeling tool; VS Code settings file renamed. Tag `v0.2-baseline` moved here |
 
 ## 6. Key decisions
 
@@ -137,6 +138,7 @@ All entries are from 2026-10-25.
 | RUACD predictions collapsed to clean/abusive when scoring | RUACD's "abusive" is broader than our `abusive` class |
 | Synthetic data is training-only; real hand-labeled data is evaluation-only | Prevents inflated scores from the model learning our own templates |
 | Hand-labeled messages come from the unlabeled RUHSOLD test tweets, a mix of random and model-picked rows; the model's predictions are hidden from the labeler | The pool is leakage-free (no model trained on it); random rows give unbiased class frequencies; candidates make sure the rare classes reach 50 examples; hiding predictions avoids anchoring |
+| The hand-labeled set is a test set: score it, do not tune on it | With only about 50 examples per rare class, splitting it further would make every score too noisy; training setup and thresholds are chosen on the RUHSOLD/RUACD validation data |
 | Labeling in an offline browser tool, not a spreadsheet | Keyboard shortcuts, live class counts, autosave, backup reminders; faster and less error-prone |
 | Raw, interim and processed CSV files are not committed | Source licenses are not all confirmed and the files contain abusive text |
 | Tests and CI from the start | Core goal of the project is demonstrable engineering practice |
@@ -250,7 +252,9 @@ python ml/scripts/train_baseline.py      # model + validation report
 python ml/scripts/run_experiments.py     # data-source and model comparisons (validation only)
 python ml/scripts/compare_operating_points.py  # AUC and recall at fixed false-alarm rates
 python ml/scripts/sample_for_labeling.py       # batch of messages for hand labeling
-# then open scripts/label_tool.html in a browser and load the batch CSV
+# open scripts/label_tool.html in a browser, load the batch CSV, label, export
+python ml/scripts/check_labeled_batch.py       # counts per class vs the target of 50 (no text printed)
+python ml/scripts/score_real_set.py            # score the model on the hand-labeled set
 
 cd ml; ruff check .; pytest              # lint and tests, one line per test with a percentage
 ```
@@ -258,7 +262,7 @@ cd ml; ruff check .; pytest              # lint and tests, one line per test wit
 ## 12. Next actions
 
 1. Confirm the provisional training setup (proposed: RUACD capped at 1,000 per class).
-2. Hand-label batch 1, then export and add the labeled file to the repo folder.
-3. Load the labeled set into the pipeline and score the model on it.
+2. Hand-label batch 1, export, and move the file to `data/custom/real_labeled/`.
+3. Run the check, fill any class below 50 with another batch, then score the model on the labeled set.
 4. Score the test set once for the chosen model.
 5. Update this file at every milestone and tag (`v0.3-api`, ...).
