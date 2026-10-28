@@ -152,7 +152,18 @@ def evaluate_by_source(
     return results
 
 
-def format_report(results: dict) -> str:
+def format_confusion(confusion: dict) -> str:
+    """Counts-only confusion matrix (rows = true label, columns = predicted)."""
+    labels = confusion["labels"]
+    header = " " * 16 + "".join(f"{x[:8]:>9}" for x in labels)
+    lines = ["confusion (rows = true, columns = predicted)", header]
+    for label, row in zip(labels, confusion["matrix"], strict=True):
+        if sum(row):
+            lines.append(f"{label:<16}" + "".join(f"{v:>9}" for v in row))
+    return "\n".join(lines)
+
+
+def format_report(results: dict, show_confusion: bool = False) -> str:
     """Readable text table of an evaluate_by_source() result."""
     lines = []
     for source, rep in results.items():
@@ -173,4 +184,7 @@ def format_report(results: dict) -> str:
         lines.append(f"toxic-vs-clean: precision {tv['precision']:.3f}  "
                      f"recall {tv['recall']:.3f}  F1 {tv['f1']:.3f}  "
                      f"false alarms on clean {tv['false_alarm_rate']:.1%}")
+        if show_confusion:
+            lines.append("")
+            lines.append(format_confusion(rep["confusion"]))
     return "\n".join(lines)

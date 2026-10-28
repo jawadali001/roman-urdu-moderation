@@ -42,10 +42,10 @@ def main() -> None:
     result = score_real_set(model, rows, n_boot=args.n_boot, progress=True)
 
     print("\n##### ALL LABELED ROWS (candidate rows flatter the model)")
-    print(format_report({"real_all": result["all"]}))
+    print(format_report({"real_all": result["all"]}, show_confusion=True))
     if result["random_only"]:
         print("\n##### RANDOM ROWS ONLY (the fair estimate)")
-        print(format_report({"real_random_only": result["random_only"]}))
+        print(format_report({"real_random_only": result["random_only"]}, show_confusion=True))
     else:
         print("\nNo rows are marked as random, so random-only numbers are not available.")
 

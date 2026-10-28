@@ -77,7 +77,11 @@ raw text ──► personal_info rules (raw text) ─┐
 - ✅ Labeling guide (`docs/labeling-guide.md`)
 - ✅ Sampling script (`ml/scripts/sample_for_labeling.py`, logic in `rumod.data.labeling` with tests) and an offline labeling tool (`scripts/label_tool.html`)
 - ✅ Checking and scoring for the labeled set (`ml/scripts/check_labeled_batch.py`, `ml/scripts/score_real_set.py`, loader in `rumod.data.real_set`, tests)
-- ⏳ Hand-label batch 1 (about 640 messages, roughly 2 hours): target at least 50 per class, scored as a test set only
+- ✅ Hand-label batch 1 (640 messages). Counts: clean 303, abusive 168, profane 116, religious_hate 36, sexual_hate 16, unsure 1. religious_hate and sexual_hate are below the target of 50
+- ✅ Agreement-study tooling: `sample_for_agreement.py`, `score_agreement.py` (modules `rumod.data.agreement`, `rumod.evaluation.agreement`, tests)
+- ⏳ Agreement study: blind-label 150 RUHSOLD validation tweets that have official labels, then compare (5 classes and toxic-vs-clean)
+- ☐ Based on the study: adjust the guide and relabel, or report both views
+- ☐ Fill the rare-class shortfall (more batches, or a lower target with wide intervals)
 - ☐ Second-labeler agreement check (Cohen's kappa) and a self-consistency re-label of 50 messages
 - ☐ Optional: a small chat-style set from outside the RUHSOLD tweets, for a genuinely different domain
 - ☐ Synthetic examples for spam, threat and personal_info (training only)
@@ -139,6 +143,8 @@ All entries are from 2026-10-25.
 | Synthetic data is training-only; real hand-labeled data is evaluation-only | Prevents inflated scores from the model learning our own templates |
 | Hand-labeled messages come from the unlabeled RUHSOLD test tweets, a mix of random and model-picked rows; the model's predictions are hidden from the labeler | The pool is leakage-free (no model trained on it); random rows give unbiased class frequencies; candidates make sure the rare classes reach 50 examples; hiding predictions avoids anchoring |
 | The hand-labeled set is a test set: score it, do not tune on it | With only about 50 examples per rare class, splitting it further would make every score too noisy; training setup and thresholds are chosen on the RUHSOLD/RUACD validation data |
+| Measure agreement with RUHSOLD's official labels (blind, on 150 validation tweets) before scoring the model on our labels | The class mix of our labels differs a lot from RUHSOLD's; without this the scores would be hard to interpret |
+| Report agreement for 5 classes and for toxic-vs-clean separately, with prevalence-weighted versions | The study sample has equal class sizes, so raw numbers describe the sample; low 5-class but high toxic-vs-clean agreement would mean only the boundaries between toxic classes differ |
 | Labeling in an offline browser tool, not a spreadsheet | Keyboard shortcuts, live class counts, autosave, backup reminders; faster and less error-prone |
 | Raw, interim and processed CSV files are not committed | Source licenses are not all confirmed and the files contain abusive text |
 | Tests and CI from the start | Core goal of the project is demonstrable engineering practice |
@@ -201,6 +207,8 @@ Several variants were compared on the same validation set, so the best-looking o
 - Even the best RUHSOLD setup misses about 20% of toxic tweets at 5% false alarms. That is the ceiling of this baseline; improving it needs a better model or better data.
 - **Proposed provisional setup: RUACD capped at 1,000 per class** (7,037 training rows). It matches RUHSOLD-only on RUHSOLD AUC and keeps most of RUACD's coverage. This is a proposal, to be revisited once the real hand-labeled set can arbitrate.
 
+**Label mismatch found in batch 1.** In the 399 random rows the class mix is clean 63%, abusive 17%, profane 14%, religious_hate 3%, sexual_hate 2.5%. RUHSOLD's cleaned training data is 53%, 24%, 6%, 8%, 8%. About 31 religious_hate tweets were expected in 400 random rows and 12 were found, which is too far off to be chance. The most likely cause is that our guide draws the boundaries differently from RUHSOLD's annotators (for example for "Sexism"), so scoring the model on our labels would partly measure that disagreement. The agreement study measures it before any scoring.
+
 ## 8. Data snapshot
 
 Raw: RUHSOLD 7,208 labeled rows (train only is usable), RUACD 147,180 rows. After cleaning: **154,192** rows (RUACD 146,996, RUHSOLD 7,196).
@@ -226,6 +234,8 @@ Splits: train 25,037 · validation 8,429 · test 8,430. Full breakdown and cavea
 
 - **RUHSOLD packaging bugs:** unlabeled test split and duplicated validation split (handled, see `data/README.md`). Published benchmark numbers cannot be compared.
 - **Very high in-distribution RUACD scores are expected** and should not be trusted on their own: the file is preprocessed, partly English, and its labels are unverified. The baseline's RUACD F1 of 0.979 against 0.672 on RUHSOLD shows the gap. The cross-dataset and real-data tests are what count.
+- **Our labels may not match RUHSOLD's definitions** (see section 7). The agreement study quantifies it.
+- **Rare-class shortfall:** sexual_hate has 16 and religious_hate 36 labeled examples in batch 1. The unused pool is about 1,341 tweets, and at the observed rates sexual_hate may stay short.
 - **The hand-labeled set is in-distribution:** it uses tweets from the RUHSOLD test pool, so it is leakage-free but not a new domain. Candidate rows were picked with the model's own scores and flatter it, so metrics are also reported on the random rows alone.
 - **RUACD may not represent real chat.** Models trained mostly on RUACD transfer poorly to tweets (see section 7), so the real hand-labeled set is needed before trusting any choice of training data.
 - **Fine-grained RUHSOLD classes overlap** (abusive vs profane, and toxic classes with each other), which caps how high per-class scores can go.
@@ -255,14 +265,18 @@ python ml/scripts/sample_for_labeling.py       # batch of messages for hand labe
 # open scripts/label_tool.html in a browser, load the batch CSV, label, export
 python ml/scripts/check_labeled_batch.py       # counts per class vs the target of 50 (no text printed)
 python ml/scripts/score_real_set.py            # score the model on the hand-labeled set
+python ml/scripts/sample_for_agreement.py      # 150 tweets to label blind (key file stays closed)
+# label them in the tool, export as agreement_labeled.csv into data/custom/agreement/
+python ml/scripts/score_agreement.py           # agreement and kappa vs RUHSOLD's official labels
 
 cd ml; ruff check .; pytest              # lint and tests, one line per test with a percentage
 ```
 
 ## 12. Next actions
 
-1. Confirm the provisional training setup (proposed: RUACD capped at 1,000 per class).
-2. Hand-label batch 1, export, and move the file to `data/custom/real_labeled/`.
-3. Run the check, fill any class below 50 with another batch, then score the model on the labeled set.
-4. Score the test set once for the chosen model.
-5. Update this file at every milestone and tag (`v0.3-api`, ...).
+1. Run the agreement study: sample, label blind (about 30 minutes), score.
+2. Decide from the result: adjust the guide and relabel, or report both views.
+3. Fix the rare-class shortfall.
+4. Score the model on the labeled set (all rows and random rows only).
+5. Confirm the provisional training setup (proposed: RUACD capped at 1,000 per class), tag `v0.3`, then build the API.
+6. Update this file at every milestone and tag.
